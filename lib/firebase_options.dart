@@ -26,10 +26,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -59,4 +56,14 @@ class DefaultFirebaseOptions {
     projectId: 'munzur-mobil',
     storageBucket: 'munzur-mobil.firebasestorage.app',
   );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyCDn6HPnnzS7dcUY1DJf_Vh3sNKlMVDnpM',
+    appId: '1:1050578240790:ios:f2fba2f1b44d2fb35e7c37',
+    messagingSenderId: '1050578240790',
+    projectId: 'munzur-mobil',
+    storageBucket: 'munzur-mobil.firebasestorage.app',
+    iosBundleId: 'com.munzur.munzurMobil',
+  );
+
 }
