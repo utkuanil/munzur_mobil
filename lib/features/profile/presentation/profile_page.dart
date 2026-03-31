@@ -129,7 +129,7 @@ class _ProfilePageState extends State<ProfilePage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Şifre Değiştir'),
+              title: const Text('Change Password'),
               content: Form(
                 key: formKey,
                 child: SingleChildScrollView(
@@ -140,7 +140,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         controller: currentPasswordController,
                         obscureText: obscureCurrent,
                         decoration: InputDecoration(
-                          labelText: 'Mevcut Şifre',
+                          labelText: 'Current Password',
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
                             onPressed: () {
@@ -160,7 +160,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
-                            return 'Mevcut şifre zorunludur';
+                            return 'Current password is required';
                           }
                           return null;
                         },
@@ -170,7 +170,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         controller: newPasswordController,
                         obscureText: obscureNew,
                         decoration: InputDecoration(
-                          labelText: 'Yeni Şifre',
+                          labelText: 'New Password',
                           prefixIcon: const Icon(Icons.lock_reset_outlined),
                           suffixIcon: IconButton(
                             onPressed: () {
@@ -190,14 +190,14 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
-                            return 'Yeni şifre zorunludur';
+                            return 'New password is required';
                           }
                           if (value.trim().length < 6) {
-                            return 'Yeni şifre en az 6 karakter olmalıdır';
+                            return 'New password must be at least 6 characters';
                           }
                           if (value.trim() ==
                               currentPasswordController.text.trim()) {
-                            return 'Yeni şifre mevcut şifre ile aynı olamaz';
+                            return 'New password cannot be the same as current password';
                           }
                           return null;
                         },
@@ -207,7 +207,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         controller: confirmPasswordController,
                         obscureText: obscureConfirm,
                         decoration: InputDecoration(
-                          labelText: 'Yeni Şifre Tekrar',
+                          labelText: 'Confirm New Password',
                           prefixIcon:
                           const Icon(Icons.verified_user_outlined),
                           suffixIcon: IconButton(
@@ -228,11 +228,11 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
-                            return 'Şifre tekrarı zorunludur';
+                            return 'Password confirmation is required';
                           }
                           if (value.trim() !=
                               newPasswordController.text.trim()) {
-                            return 'Yeni şifreler eşleşmiyor';
+                            return 'Passwords do not match';
                           }
                           return null;
                         },
@@ -245,7 +245,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 TextButton(
                   onPressed:
                   loading ? null : () => Navigator.of(dialogContext).pop(),
-                  child: const Text('İptal'),
+                  child: const Text('Cancel'),
                 ),
                 FilledButton(
                   onPressed: loading
@@ -276,7 +276,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                      : const Text('Güncelle'),
+                      : const Text('Update'),
                 ),
               ],
             );
@@ -295,8 +295,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     await firestore.collection('users').doc(uid).delete();
 
-    // İleride kullanıcıya bağlı başka koleksiyonların varsa buraya ekleyebilirsin.
-    // Örnek:
+    // İleride kullanıcıya bağlı başka koleksiyonlar varsa buraya ekleyebilirsin.
     // await firestore.collection('favorites').doc(uid).delete();
     // await firestore.collection('settings').doc(uid).delete();
   }
@@ -350,25 +349,25 @@ class _ProfilePageState extends State<ProfilePage> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Hesabın kalıcı olarak silindi.'),
+            content: Text('Your account has been permanently deleted.'),
           ),
         );
         context.go('/login');
       }
     } on FirebaseAuthException catch (e) {
-      String message = 'Hesap silinemedi.';
+      String message = 'Account could not be deleted.';
 
       if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
-        message = 'Mevcut şifre hatalı.';
+        message = 'Current password is incorrect.';
       } else if (e.code == 'requires-recent-login') {
         message =
-        'Güvenlik nedeniyle yeniden doğrulama gerekiyor. Lütfen tekrar dene.';
+        'Re-authentication is required for security reasons. Please try again.';
       } else if (e.code == 'missing-password') {
-        message = 'Hesabı silmek için mevcut şifreni girmelisin.';
+        message = 'Please enter your current password.';
       } else if (e.code == 'too-many-requests') {
-        message = 'Çok fazla deneme yapıldı. Lütfen biraz sonra tekrar dene.';
+        message = 'Too many attempts. Please try again later.';
       } else if (e.code == 'network-request-failed') {
-        message = 'Ağ bağlantısı hatası oluştu. İnternetini kontrol et.';
+        message = 'Network error. Please check your internet connection.';
       }
 
       if (context.mounted) {
@@ -380,11 +379,41 @@ class _ProfilePageState extends State<ProfilePage> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Beklenmeyen bir hata oluştu.'),
+            content: Text('An unexpected error occurred.'),
           ),
         );
       }
     }
+  }
+
+  void _showDeleteAccountConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Account'),
+          content: const Text(
+            'Are you sure you want to permanently delete your account?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.tonal(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                _showDeleteAccountDialog(context);
+              },
+              style: FilledButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Continue'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showDeleteAccountDialog(BuildContext context) {
@@ -404,7 +433,7 @@ class _ProfilePageState extends State<ProfilePage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Hesabımı Sil'),
+              title: const Text('Delete Account'),
               content: Form(
                 key: formKey,
                 child: SingleChildScrollView(
@@ -413,15 +442,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Bu işlem geri alınamaz. Hesabın ve kayıtlı kullanıcı verilerin kalıcı olarak silinecektir.',
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Devam etmek için işlemi onayla.',
-                        style: TextStyle(
-                          color: Colors.black54,
-                          fontSize: 13,
-                        ),
+                        'This action will permanently delete your account and associated user data. This cannot be undone.',
                       ),
                       if (requiresPassword) ...[
                         const SizedBox(height: 16),
@@ -429,7 +450,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           controller: passwordController,
                           obscureText: obscurePassword,
                           decoration: InputDecoration(
-                            labelText: 'Mevcut Şifre',
+                            labelText: 'Current Password',
                             prefixIcon: const Icon(Icons.lock_outline),
                             suffixIcon: IconButton(
                               onPressed: () {
@@ -450,7 +471,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           validator: (value) {
                             if (!requiresPassword) return null;
                             if (value == null || value.trim().isEmpty) {
-                              return 'Mevcut şifre zorunludur';
+                              return 'Current password is required';
                             }
                             return null;
                           },
@@ -464,7 +485,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 TextButton(
                   onPressed:
                   loading ? null : () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Vazgeç'),
+                  child: const Text('Cancel'),
                 ),
                 FilledButton.tonal(
                   onPressed: loading
@@ -489,13 +510,16 @@ class _ProfilePageState extends State<ProfilePage> {
                       });
                     }
                   },
+                  style: FilledButton.styleFrom(
+                    foregroundColor: Colors.red,
+                  ),
                   child: loading
                       ? const SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                      : const Text('Hesabı Kalıcı Olarak Sil'),
+                      : const Text('Delete Account'),
                 ),
               ],
             );
@@ -1427,6 +1451,73 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Widget _buildDeleteAccountCard(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const CircleAvatar(
+          backgroundColor: Color(0x1AFF0000),
+          child: Icon(
+            Icons.delete_forever_outlined,
+            color: Colors.red,
+          ),
+        ),
+        title: const Text(
+          'Delete Account',
+          style: TextStyle(
+            color: Colors.red,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        subtitle: const Text(
+          'Permanently delete your account and associated data',
+        ),
+        trailing: const Icon(
+          Icons.chevron_right_rounded,
+          color: Colors.red,
+        ),
+        onTap: () => _showDeleteAccountConfirmation(context),
+      ),
+    );
+  }
+
+  Widget _buildSettingsCard(BuildContext context) {
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.lock_reset_outlined),
+            title: const Text('Şifreni Değiştir'),
+            subtitle: const Text('Hesabının giriş şifresini güncelle'),
+            onTap: () => _showChangePasswordDialog(context),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('Uygulama Hakkında'),
+            subtitle: const Text('Munzur Mobil - Kampüs Cebinde'),
+            onTap: () => _showAboutDialog(context),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text(
+              'Çıkış Yap',
+              style: TextStyle(color: Colors.red),
+            ),
+            subtitle: const Text('Mevcut hesabından çıkış yap'),
+            onTap: () async {
+              await FirebaseAuth.instance.signOut();
+
+              if (context.mounted) {
+                context.go('/login');
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -1504,6 +1595,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+
+            _buildDeleteAccountCard(context),
+
             const SizedBox(height: 16),
             FutureBuilder<List<AiInsightItem>>(
               future: _buildAiInsights(enrichedData),
@@ -1534,55 +1629,7 @@ class _ProfilePageState extends State<ProfilePage> {
             else
               _buildStudentInfoCard(enrichedData),
             const SizedBox(height: 16),
-            Card(
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.lock_reset_outlined),
-                    title: const Text('Şifre Değiştir'),
-                    subtitle: const Text('Hesabının giriş şifresini güncelle'),
-                    onTap: () => _showChangePasswordDialog(context),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(
-                      Icons.delete_forever_outlined,
-                      color: Colors.red,
-                    ),
-                    title: const Text(
-                      'Hesabımı Sil',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                    subtitle: const Text(
-                      'Hesabını ve kayıtlı verilerini kalıcı olarak sil',
-                    ),
-                    onTap: () => _showDeleteAccountDialog(context),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.info_outline),
-                    title: const Text('Uygulama Hakkında'),
-                    subtitle: const Text('Munzur Mobil - Kampüs Cebinde'),
-                    onTap: () => _showAboutDialog(context),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.logout, color: Colors.red),
-                    title: const Text(
-                      'Çıkış Yap',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                    onTap: () async {
-                      await FirebaseAuth.instance.signOut();
-
-                      if (context.mounted) {
-                        context.go('/login');
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
+            _buildSettingsCard(context),
           ],
         );
       },
