@@ -286,6 +286,225 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  bool _isPasswordUser(User user) {
+    return user.providerData.any((p) => p.providerId == 'password');
+  }
+
+  Future<void> _deleteUserRelatedData(String uid) async {
+    final firestore = FirebaseFirestore.instance;
+
+    await firestore.collection('users').doc(uid).delete();
+
+    // İleride kullanıcıya bağlı başka koleksiyonların varsa buraya ekleyebilirsin.
+    // Örnek:
+    // await firestore.collection('favorites').doc(uid).delete();
+    // await firestore.collection('settings').doc(uid).delete();
+  }
+
+  Future<void> _deleteAccount({
+    required BuildContext context,
+    String? currentPassword,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Oturum bilgisi bulunamadı.')),
+        );
+      }
+      return;
+    }
+
+    try {
+      if (_isPasswordUser(user)) {
+        final email = user.email;
+
+        if (email == null || email.trim().isEmpty) {
+          throw FirebaseAuthException(
+            code: 'invalid-user',
+            message: 'Kullanıcı e-posta bilgisi bulunamadı.',
+          );
+        }
+
+        if (currentPassword == null || currentPassword.trim().isEmpty) {
+          throw FirebaseAuthException(
+            code: 'missing-password',
+            message: 'Mevcut şifre gerekli.',
+          );
+        }
+
+        final credential = EmailAuthProvider.credential(
+          email: email.trim(),
+          password: currentPassword.trim(),
+        );
+
+        await user.reauthenticateWithCredential(credential);
+      }
+
+      final uid = user.uid;
+
+      await _deleteUserRelatedData(uid);
+      await user.delete();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Hesabın kalıcı olarak silindi.'),
+          ),
+        );
+        context.go('/login');
+      }
+    } on FirebaseAuthException catch (e) {
+      String message = 'Hesap silinemedi.';
+
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        message = 'Mevcut şifre hatalı.';
+      } else if (e.code == 'requires-recent-login') {
+        message =
+        'Güvenlik nedeniyle yeniden doğrulama gerekiyor. Lütfen tekrar dene.';
+      } else if (e.code == 'missing-password') {
+        message = 'Hesabı silmek için mevcut şifreni girmelisin.';
+      } else if (e.code == 'too-many-requests') {
+        message = 'Çok fazla deneme yapıldı. Lütfen biraz sonra tekrar dene.';
+      } else if (e.code == 'network-request-failed') {
+        message = 'Ağ bağlantısı hatası oluştu. İnternetini kontrol et.';
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Beklenmeyen bir hata oluştu.'),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showDeleteAccountDialog(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final requiresPassword = user != null && _isPasswordUser(user);
+
+    final passwordController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    bool loading = false;
+    bool obscurePassword = true;
+
+    showDialog(
+      context: context,
+      barrierDismissible: !loading,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Hesabımı Sil'),
+              content: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Bu işlem geri alınamaz. Hesabın ve kayıtlı kullanıcı verilerin kalıcı olarak silinecektir.',
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Devam etmek için işlemi onayla.',
+                        style: TextStyle(
+                          color: Colors.black54,
+                          fontSize: 13,
+                        ),
+                      ),
+                      if (requiresPassword) ...[
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: passwordController,
+                          obscureText: obscurePassword,
+                          decoration: InputDecoration(
+                            labelText: 'Mevcut Şifre',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              onPressed: () {
+                                setDialogState(() {
+                                  obscurePassword = !obscurePassword;
+                                });
+                              },
+                              icon: Icon(
+                                obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (!requiresPassword) return null;
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Mevcut şifre zorunludur';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed:
+                  loading ? null : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Vazgeç'),
+                ),
+                FilledButton.tonal(
+                  onPressed: loading
+                      ? null
+                      : () async {
+                    if (!formKey.currentState!.validate()) return;
+
+                    setDialogState(() {
+                      loading = true;
+                    });
+
+                    await _deleteAccount(
+                      context: dialogContext,
+                      currentPassword: requiresPassword
+                          ? passwordController.text.trim()
+                          : null,
+                    );
+
+                    if (dialogContext.mounted) {
+                      setDialogState(() {
+                        loading = false;
+                      });
+                    }
+                  },
+                  child: loading
+                      ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                      : const Text('Hesabı Kalıcı Olarak Sil'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   String _extractStudentNoFromEmail(String email) {
     final normalized = email.trim().toLowerCase();
 
@@ -1323,6 +1542,21 @@ class _ProfilePageState extends State<ProfilePage> {
                     title: const Text('Şifre Değiştir'),
                     subtitle: const Text('Hesabının giriş şifresini güncelle'),
                     onTap: () => _showChangePasswordDialog(context),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.delete_forever_outlined,
+                      color: Colors.red,
+                    ),
+                    title: const Text(
+                      'Hesabımı Sil',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    subtitle: const Text(
+                      'Hesabını ve kayıtlı verilerini kalıcı olarak sil',
+                    ),
+                    onTap: () => _showDeleteAccountDialog(context),
                   ),
                   const Divider(height: 1),
                   ListTile(
