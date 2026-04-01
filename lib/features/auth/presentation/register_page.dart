@@ -38,6 +38,8 @@ class _RegisterPageState extends State<RegisterPage> {
   String? _academicTitle;
   String? _adminEmploymentType;
 
+  String? _currentRole;
+
   Map<String, Map<String, List<String>>> _academicStructure = {
     'Ön Lisans': {},
     'Lisans': {},
@@ -274,10 +276,7 @@ class _RegisterPageState extends State<RegisterPage> {
     final normalized = email.trim().toLowerCase();
 
     if (normalized.isEmpty) return null;
-
-    if (!normalized.endsWith('@munzur.edu.tr')) {
-      return 'student';
-    }
+    if (!normalized.endsWith('@munzur.edu.tr')) return null;
 
     final localPart = normalized.split('@').first;
 
@@ -286,6 +285,12 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     return 'staff';
+  }
+
+  String _extractStudentNoFromEmail(String email) {
+    final normalized = email.trim().toLowerCase();
+    final localPart = normalized.split('@').first;
+    return RegExp(r'^\d+$').hasMatch(localPart) ? localPart : '';
   }
 
   bool get _isStudent => _currentRole == 'student';
@@ -335,30 +340,42 @@ class _RegisterPageState extends State<RegisterPage> {
     _adminEmploymentType = null;
   }
 
-  String? _currentRole;
-
   void _onEmailChanged(String value) {
     final detectedRole = _detectRoleFromEmail(value);
-
-    if (detectedRole == _currentRole) return;
+    final extractedStudentNo = _extractStudentNoFromEmail(value);
 
     setState(() {
-      _currentRole = detectedRole;
       _error = null;
 
+      if (detectedRole != _currentRole) {
+        _currentRole = detectedRole;
+
+        if (detectedRole == 'student') {
+          _resetStaffFields();
+        } else if (detectedRole == 'staff') {
+          _resetStudentFields();
+        } else {
+          _resetStudentFields();
+          _resetStaffFields();
+        }
+      }
+
       if (detectedRole == 'student') {
-        _resetStaffFields();
-      } else if (detectedRole == 'staff') {
-        _resetStudentFields();
-      } else {
-        _resetStudentFields();
-        _resetStaffFields();
+        _studentNoController.text = extractedStudentNo;
       }
     });
   }
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (_currentRole == null) {
+      setState(() {
+        _error =
+        'Lütfen geçerli bir Munzur Üniversitesi e-posta adresi giriniz.';
+      });
+      return;
+    }
 
     if (_isStudent) {
       if (_educationLevel == null || _unit == null || _department == null) {
@@ -426,8 +443,9 @@ class _RegisterPageState extends State<RegisterPage> {
         (_isStaff && _staffType == 'İdari') ? (_staffUnit ?? '') : '',
         academicTitle:
         (_isStaff && _staffType == 'Akademik') ? (_academicTitle ?? '') : '',
-        employmentType:
-        (_isStaff && _staffType == 'İdari') ? (_adminEmploymentType ?? '') : '',
+        employmentType: (_isStaff && _staffType == 'İdari')
+            ? (_adminEmploymentType ?? '')
+            : '',
       );
 
       if (!mounted) return;
@@ -541,7 +559,17 @@ class _RegisterPageState extends State<RegisterPage> {
                             label: 'Üniversite E-postası',
                             icon: Icons.email_outlined,
                           ),
-                          validator: Validators.validateEmail,
+                          validator: (v) {
+                            final baseValidation = Validators.validateEmail(v);
+                            if (baseValidation != null) return baseValidation;
+
+                            final email = (v ?? '').trim().toLowerCase();
+                            if (!email.endsWith('@munzur.edu.tr')) {
+                              return 'Lütfen @munzur.edu.tr uzantılı e-posta giriniz';
+                            }
+
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 14),
 
@@ -554,6 +582,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         if (_isStudent) ...[
                           TextFormField(
                             controller: _studentNoController,
+                            readOnly: true,
                             decoration: _inputDecoration(
                               label: 'Öğrenci Numarası',
                               icon: Icons.badge_outlined,
@@ -775,8 +804,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 ),
                               )
                                   .toList(),
-                              onChanged:
-                              (_staffUnit == null ||
+                              onChanged: (_staffUnit == null ||
                                   _loading ||
                                   _loadingAcademicData)
                                   ? null

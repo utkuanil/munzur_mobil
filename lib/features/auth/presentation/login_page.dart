@@ -42,7 +42,8 @@ class _LoginPageState extends State<LoginPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-              'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.'),
+            'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.',
+          ),
         ),
       );
     } on FirebaseAuthException catch (e) {
@@ -68,20 +69,28 @@ class _LoginPageState extends State<LoginPage> {
         password: _passwordController.text,
       );
 
-      final verified = await _repo.refreshAndCheckEmailVerified();
+      final firebaseVerified = await _repo.refreshAndCheckEmailVerified();
+      final userStatus = await _repo.getCurrentUserStatus();
 
-      if (!verified) {
-        if (!mounted) return;
-        context.go(
-          '/verify-email?email=${Uri.encodeComponent(_emailController.text.trim())}',
+      final isActive = userStatus['isActive'] == true;
+      final isVerifiedByCode = userStatus['isVerifiedByCode'] == true;
+
+      final canLogin = isActive && (firebaseVerified || isVerifiedByCode);
+
+      if (canLogin) {
+        await _repo.activateIfVerified(
+          forceVerifiedByCode: isVerifiedByCode,
         );
+
+        if (!mounted) return;
+        context.go('/home');
         return;
       }
 
-      await _repo.activateIfVerified();
-
       if (!mounted) return;
-      context.go('/home');
+      context.go(
+        '/verify-email?email=${Uri.encodeComponent(_emailController.text.trim())}',
+      );
     } on FirebaseAuthException catch (e) {
       setState(() {
         _error = e.message ?? 'Giriş başarısız';
@@ -157,7 +166,6 @@ class _LoginPageState extends State<LoginPage> {
                         _logoArea(),
                         const SizedBox(height: 28),
 
-                        // EMAIL
                         TextFormField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
@@ -170,7 +178,6 @@ class _LoginPageState extends State<LoginPage> {
 
                         const SizedBox(height: 14),
 
-                        // PASSWORD
                         TextFormField(
                           controller: _passwordController,
                           obscureText: _obscurePassword,
@@ -193,13 +200,11 @@ class _LoginPageState extends State<LoginPage> {
                           validator: Validators.validatePassword,
                         ),
 
-                        // 🔥 ŞİFREMİ UNUTTUM (DOĞRU YER)
                         const SizedBox(height: 6),
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                            onPressed:
-                            _loading ? null : _forgotPassword,
+                            onPressed: _loading ? null : _forgotPassword,
                             child: const Text('Şifremi Unuttum'),
                           ),
                         ),
@@ -240,9 +245,8 @@ class _LoginPageState extends State<LoginPage> {
                         const SizedBox(height: 12),
 
                         TextButton(
-                          onPressed: _loading
-                              ? null
-                              : () => context.go('/register'),
+                          onPressed:
+                          _loading ? null : () => context.go('/register'),
                           child: const Text('Hesabın yok mu? Kayıt ol'),
                         ),
                       ],

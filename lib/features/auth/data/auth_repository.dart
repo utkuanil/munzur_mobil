@@ -155,6 +155,26 @@ class AuthRepository {
     return _firestore.collection('users').doc(user.uid).get();
   }
 
+  Future<Map<String, dynamic>> getCurrentUserStatus() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'user-null',
+        message: 'Oturum açmış kullanıcı bulunamadı.',
+      );
+    }
+
+    final doc = await _firestore.collection('users').doc(user.uid).get();
+    final data = doc.data() ?? <String, dynamic>{};
+
+    return {
+      'isActive': data['isActive'] == true,
+      'isVerifiedByCode': data['isVerifiedByCode'] == true,
+      'role': data['role'],
+      'email': data['email'],
+    };
+  }
+
   Future<void> activateIfVerified({bool forceVerifiedByCode = false}) async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -177,6 +197,23 @@ class AuthRepository {
         'verifiedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     }
+  }
+
+  Future<bool> canUserLogin() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+
+    await user.reload();
+    final refreshedUser = _auth.currentUser;
+    final emailVerified = refreshedUser?.emailVerified ?? false;
+
+    final doc = await _firestore.collection('users').doc(user.uid).get();
+    final data = doc.data() ?? {};
+
+    final isActive = data['isActive'] == true;
+    final isVerifiedByCode = data['isVerifiedByCode'] == true;
+
+    return isActive && (emailVerified || isVerifiedByCode);
   }
 
   Future<bool> isUserActive(String uid) async {
